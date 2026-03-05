@@ -150,6 +150,62 @@ describe("OpenAPI Adapter", () => {
     fs.unlinkSync(tmpPath);
   });
 
+  it("resolves oneOf/anyOf by picking the first variant", async () => {
+    const fs = await import("fs");
+    const tmpSpec = {
+      openapi: "3.0.0",
+      info: { title: "oneOf test", version: "1.0.0" },
+      paths: {
+        "/payments": {
+          post: {
+            requestBody: {
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      method: {
+                        oneOf: [
+                          { type: "object", properties: { card_number: { type: "string" }, cvv: { type: "string" } } },
+                          { type: "object", properties: { iban: { type: "string" } } },
+                        ],
+                      },
+                      amount: {
+                        anyOf: [
+                          { type: "number" },
+                          { type: "string" },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: { "200": { description: "OK" } },
+          },
+        },
+      },
+    };
+    const tmpPath = "/tmp/havoc-oneof-test.json";
+    fs.writeFileSync(tmpPath, JSON.stringify(tmpSpec));
+    const endpoints = await discover(tmpPath);
+    const post = endpoints.find((e) => e.id === "POST /payments")!;
+
+    // oneOf: should pick first variant (card payment)
+    const methodField = post.input.fields.find((f) => f.name === "method")!;
+    expect(methodField.type).toBe("object");
+    expect(methodField.constraints.fields).toBeDefined();
+    const childNames = methodField.constraints.fields!.map((f) => f.name);
+    expect(childNames).toContain("card_number");
+    expect(childNames).toContain("cvv");
+
+    // anyOf: should pick first variant (number)
+    const amountField = post.input.fields.find((f) => f.name === "amount")!;
+    expect(amountField.type).toBe("float");
+
+    fs.unlinkSync(tmpPath);
+  });
+
   it("parses nested array items (orders)", async () => {
     const endpoints = await discover(SPEC_PATH);
     const createOrder = endpoints.find((e) => e.id === "POST /orders")!;

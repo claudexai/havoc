@@ -99,7 +99,7 @@ function schemaToFields(schema: any): Field[] {
   if (!schema) return [];
 
   // Resolve allOf at the top level too
-  schema = resolveAllOf(schema);
+  schema = resolveComposedSchema(schema);
 
   // If the schema itself is an object with properties, return those fields
   if (schema.type === "object" || schema.properties) {
@@ -128,26 +128,40 @@ function schemaToFields(schema: any): Field[] {
   return [];
 }
 
-function resolveAllOf(prop: any): any {
-  if (!prop.allOf) return prop;
-  // Merge all allOf entries into a single schema
-  let merged: any = {};
-  for (const part of prop.allOf) {
-    const resolved = resolveAllOf(part);
-    merged = {
-      ...merged,
-      ...resolved,
-      properties: { ...merged.properties, ...resolved.properties },
-      required: [...(merged.required || []), ...(resolved.required || [])],
-    };
+function resolveComposedSchema(prop: any): any {
+  if (!prop) return prop;
+
+  // allOf: merge all entries into a single schema
+  if (prop.allOf) {
+    let merged: any = {};
+    for (const part of prop.allOf) {
+      const resolved = resolveComposedSchema(part);
+      merged = {
+        ...merged,
+        ...resolved,
+        properties: { ...merged.properties, ...resolved.properties },
+        required: [...(merged.required || []), ...(resolved.required || [])],
+      };
+    }
+    const { allOf, ...siblings } = prop;
+    return { ...merged, ...siblings, properties: { ...merged.properties, ...siblings.properties } };
   }
-  // Carry over any sibling properties from the original (e.g. nullable, description)
-  const { allOf, ...siblings } = prop;
-  return { ...merged, ...siblings, properties: { ...merged.properties, ...siblings.properties } };
+
+  // oneOf / anyOf: pick the first variant (best-effort — generates tests for the primary schema)
+  if (prop.oneOf && prop.oneOf.length > 0) {
+    const { oneOf, ...siblings } = prop;
+    return { ...resolveComposedSchema(oneOf[0]), ...siblings };
+  }
+  if (prop.anyOf && prop.anyOf.length > 0) {
+    const { anyOf, ...siblings } = prop;
+    return { ...resolveComposedSchema(anyOf[0]), ...siblings };
+  }
+
+  return prop;
 }
 
 function propToField(name: string, prop: any): Field {
-  prop = resolveAllOf(prop);
+  prop = resolveComposedSchema(prop);
   const type = mapType(prop);
   const constraints: Field["constraints"] = {};
 
