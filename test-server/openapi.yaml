@@ -1,0 +1,282 @@
+openapi: 3.0.3
+info:
+  title: Buggy Store API
+  version: 1.0.0
+  description: A deliberately buggy API for testing Havoc
+
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /products:
+    get:
+      operationId: listProducts
+      summary: List products
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [price_asc, price_desc]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+                  count:
+                    type: integer
+                  total:
+                    type: integer
+
+    post:
+      operationId: createProduct
+      summary: Create a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, price, category]
+              properties:
+                name:
+                  type: string
+                  maxLength: 200
+                price:
+                  type: number
+                  minimum: 0.01
+                  maximum: 999999.99
+                category:
+                  type: string
+                  enum: [tools, electronics, clothing, food]
+                stock:
+                  type: integer
+                  minimum: 0
+                  maximum: 100000
+      responses:
+        "201":
+          description: Created product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Validation error
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      summary: Get a product by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+
+    put:
+      operationId: updateProduct
+      summary: Update a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 200
+                price:
+                  type: number
+                  minimum: 0.01
+                  maximum: 999999.99
+                category:
+                  type: string
+                  enum: [tools, electronics, clothing, food]
+                stock:
+                  type: integer
+                  minimum: 0
+                  maximum: 100000
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+
+    delete:
+      operationId: deleteProduct
+      summary: Delete a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        "404":
+          description: Not found
+
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id:
+                        type: string
+                      quantity:
+                        type: integer
+                        minimum: 1
+                        maximum: 1000
+      responses:
+        "201":
+          description: Created order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Validation error
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      summary: Get an order by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: Not found
+
+  /orders/{id}/ship:
+    post:
+      operationId: shipOrder
+      summary: Ship an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shipped order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: Not found
+
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        category:
+          type: string
+        stock:
+          type: integer
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id:
+                type: string
+              quantity:
+                type: integer
+              price:
+                type: number
+              name:
+                type: string
+        total:
+          type: number
+        status:
+          type: string
+          enum: [pending, shipped, delivered]
+        created_at:
+          type: string
+          format: date-time
