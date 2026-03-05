@@ -124,15 +124,30 @@ export async function run(config: HavocConfig): Promise<void> {
 
   // --fail-on support
   if (config.failOn) {
-    let shouldFail = false;
-    if (config.failOn === "any_bugs" && uniqueBugs.length > 0) shouldFail = true;
-    if (config.failOn === "new_bugs" && newBugs.length > 0) shouldFail = true;
-    if (config.failOn === "regressions" && regressions.length > 0) shouldFail = true;
-    if (config.failOn === "critical" && uniqueBugs.some((b) => b.severity === "critical")) shouldFail = true;
-
+    const shouldFail = checkFailOn(config.failOn, uniqueBugs, newBugs, regressions);
     if (shouldFail) {
-      console.log(`\n  ❌ --fail-on ${config.failOn} triggered. Exiting with code 1.\n`);
+      console.log(`\n  --fail-on ${config.failOn} triggered. Exiting with code 1.\n`);
       process.exit(1);
     }
+  }
+}
+
+export function checkFailOn(
+  condition: string,
+  allBugs: Bug[],
+  newBugs: Bug[],
+  regressions: Bug[]
+): boolean {
+  switch (condition) {
+    case "any_bugs":
+      return allBugs.length > 0;
+    case "new_bugs":
+      return newBugs.length > 0;
+    case "regressions":
+      return regressions.length > 0;
+    case "critical":
+      return allBugs.some((b) => b.severity === "critical");
+    default:
+      return false;
   }
 }
