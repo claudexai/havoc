@@ -5,6 +5,8 @@ import { HavocTransport } from "../src/transport/rest.js";
 import { runBaseline } from "../src/core/baseline.js";
 import { BoundaryWalker } from "../src/agents/boundary-walker.js";
 import { MutantBreeder } from "../src/agents/mutant-breeder.js";
+import { TypeShapeshifter } from "../src/agents/type-shapeshifter.js";
+import { ConsistencyChecker } from "../src/oracles/consistency.js";
 import { ChildProcess, fork } from "child_process";
 import path from "path";
 
@@ -132,6 +134,39 @@ describe("Mutant Breeder (integration)", () => {
     expect(result.agent).toBe("mutant_breeder");
     expect(result.requests_sent).toBeGreaterThan(0);
     // Injection of price_override, is_admin, etc. should trigger bugs
+    expect(result.bugs.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Type Shapeshifter (integration)", () => {
+  it("finds bugs by sending wrong types", async () => {
+    const endpoints = await discover(SPEC_PATH);
+    const target = endpoints.filter((e) => e.id === "POST /products");
+    const transport = new HavocTransport(SERVER_URL, {});
+    const seeds = generateSeeds(target, 42);
+    const baselines = await runBaseline(transport, seeds);
+
+    const agent = new TypeShapeshifter(transport, target, seeds, baselines, 42);
+    const result = await agent.run();
+
+    expect(result.agent).toBe("type_shapeshifter");
+    expect(result.requests_sent).toBeGreaterThan(0);
+    // Sending "2" instead of 2, float instead of int, etc. should find bugs
+    expect(result.bugs.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Consistency Checker (integration)", () => {
+  it("finds create-read inconsistencies", async () => {
+    const endpoints = await discover(SPEC_PATH);
+    const transport = new HavocTransport(SERVER_URL, {});
+    const seeds = generateSeeds(endpoints, 42);
+
+    const checker = new ConsistencyChecker(transport, endpoints, seeds);
+    const result = await checker.run("consistency_checker", 1);
+
+    expect(result.requests).toBeGreaterThan(0);
+    // The buggy server has count mismatches, delete-without-404, etc.
     expect(result.bugs.length).toBeGreaterThan(0);
   });
 });

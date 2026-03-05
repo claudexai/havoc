@@ -3,6 +3,7 @@ import { HavocTransport } from "../transport/rest.js";
 import { Seed } from "../core/seed.js";
 import { Baseline } from "../core/baseline.js";
 import { checkSchema } from "../oracles/schema.js";
+import { checkResponseSchema } from "../oracles/response-schema.js";
 
 export class BoundaryWalker {
   private bugs: Bug[] = [];
@@ -30,17 +31,7 @@ export class BoundaryWalker {
         const boundaryValues = this.getBoundaryValues(field);
         for (const { value, label } of boundaryValues) {
           const mutated = { ...payload, [field.name]: value };
-          const response = await this.transport.send(endpoint, mutated, pathParams);
-          this.requestCount++;
-
-          const bug = checkSchema(
-            endpoint, mutated, response, this.transport,
-            "boundary_walker", 1, true
-          );
-          if (bug) {
-            bug.description += ` (boundary: ${field.name}=${label})`;
-            this.addBug(bug);
-          }
+          await this.test(endpoint, mutated, pathParams, `boundary: ${field.name}=${label}`);
         }
       }
 
@@ -48,47 +39,18 @@ export class BoundaryWalker {
       for (const reqField of endpoint.input.required) {
         const mutated = { ...payload };
         delete mutated[reqField];
-        const response = await this.transport.send(endpoint, mutated, pathParams);
-        this.requestCount++;
-
-        const bug = checkSchema(
-          endpoint, mutated, response, this.transport,
-          "boundary_walker", 1, true
-        );
-        if (bug) {
-          bug.description += ` (missing required field: ${reqField})`;
-          this.addBug(bug);
-        }
+        await this.test(endpoint, mutated, pathParams, `missing required field: ${reqField}`);
       }
 
       // Test null for each field
       for (const field of endpoint.input.fields) {
         if (endpoint.path.includes(`{${field.name}}`)) continue;
         const mutated = { ...payload, [field.name]: null };
-        const response = await this.transport.send(endpoint, mutated, pathParams);
-        this.requestCount++;
-
-        const bug = checkSchema(
-          endpoint, mutated, response, this.transport,
-          "boundary_walker", 1, true
-        );
-        if (bug) {
-          bug.description += ` (null field: ${field.name})`;
-          this.addBug(bug);
-        }
+        await this.test(endpoint, mutated, pathParams, `null field: ${field.name}`);
       }
 
       // Test empty body
-      const emptyResponse = await this.transport.send(endpoint, {}, pathParams);
-      this.requestCount++;
-      const emptyBug = checkSchema(
-        endpoint, {}, emptyResponse, this.transport,
-        "boundary_walker", 1, true
-      );
-      if (emptyBug) {
-        emptyBug.description += " (empty body)";
-        this.addBug(emptyBug);
-      }
+      await this.test(endpoint, {}, pathParams, "empty body");
     }
 
     const duration = performance.now() - start;
@@ -172,6 +134,37 @@ export class BoundaryWalker {
     }
 
     return values;
+  }
+
+  private async test(
+    endpoint: HavocEndpoint,
+    payload: any,
+    pathParams: Record<string, string>,
+    label: string
+  ): Promise<void> {
+    const response = await this.transport.send(endpoint, payload, pathParams);
+    this.requestCount++;
+
+    const bug = checkSchema(
+      endpoint, payload, response, this.transport,
+      "boundary_walker", 1, true
+    );
+    if (bug) {
+      bug.description += ` (${label})`;
+      this.addBug(bug);
+    }
+
+    // Oracle Layer 3: response schema validation
+    if (response.status >= 200 && response.status < 300) {
+      const schemaBugs = checkResponseSchema(
+        endpoint, payload, response, this.transport,
+        "boundary_walker", 1
+      );
+      for (const sb of schemaBugs) {
+        sb.description += ` (${label})`;
+        this.addBug(sb);
+      }
+    }
   }
 
   private addBug(bug: Bug): void {

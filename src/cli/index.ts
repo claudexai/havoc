@@ -50,6 +50,7 @@ program
       },
       timeout: parseInt(opts.timeout, 10),
       seed: parseInt(opts.seed, 10),
+      failOn: opts.failOn,
     });
   });
 

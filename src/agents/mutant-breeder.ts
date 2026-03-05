@@ -3,6 +3,7 @@ import { HavocTransport } from "../transport/rest.js";
 import { Seed } from "../core/seed.js";
 import { Baseline } from "../core/baseline.js";
 import { checkSchema } from "../oracles/schema.js";
+import { checkResponseSchema } from "../oracles/response-schema.js";
 
 export class MutantBreeder {
   private bugs: Bug[] = [];
@@ -118,6 +119,20 @@ export class MutantBreeder {
       bug.description += ` (mutation: ${mutation})`;
       if (!this.bugs.some((b) => b.fingerprint === bug.fingerprint)) {
         this.bugs.push(bug);
+      }
+    }
+
+    // Oracle Layer 3: response schema validation
+    if (response.status >= 200 && response.status < 300) {
+      const schemaBugs = checkResponseSchema(
+        endpoint, payload, response, this.transport,
+        "mutant_breeder", 1
+      );
+      for (const sb of schemaBugs) {
+        sb.description += ` (mutation: ${mutation})`;
+        if (!this.bugs.some((b) => b.fingerprint === sb.fingerprint)) {
+          this.bugs.push(sb);
+        }
       }
     }
   }

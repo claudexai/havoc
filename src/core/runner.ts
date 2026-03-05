@@ -3,9 +3,12 @@ import { discover } from "../adapters/openapi.js";
 import { generateSeeds, Seed } from "../core/seed.js";
 import { HavocTransport } from "../transport/rest.js";
 import { runBaseline, Baseline } from "../core/baseline.js";
+import { ConsistencyChecker } from "../oracles/consistency.js";
+import { BugTracker } from "../core/bug-tracker.js";
 import { reportBugs } from "../core/reporter.js";
 
 export async function run(config: HavocConfig): Promise<void> {
+  const runStart = performance.now();
   console.log("\n⚔️  HAVOC — Multi-Agent API Adversarial Testing Engine\n");
 
   // Step 1: DISCOVER
@@ -50,10 +53,48 @@ export async function run(config: HavocConfig): Promise<void> {
     agentPromises.push(agent.run());
   }
 
+  if (config.agents.type_shapeshifter) {
+    const { TypeShapeshifter } = await import("../agents/type-shapeshifter.js");
+    const agent = new TypeShapeshifter(transport, endpoints, seeds, baselines, config.seed);
+    agentPromises.push(agent.run());
+  }
+
   const agentResults = await Promise.all(agentPromises);
   for (const result of agentResults) {
     results.push(result);
     allBugs.push(...result.bugs);
+  }
+
+  // Oracle Layer 2: Self-consistency checks (runs after agents)
+  console.log("\n  [Consistency Checker] Running self-consistency checks...");
+  const consistency = new ConsistencyChecker(transport, endpoints, seeds);
+  const consistencyResult = await consistency.run("consistency_checker", 1);
+  allBugs.push(...consistencyResult.bugs);
+  results.push({
+    agent: "consistency_checker",
+    bugs: consistencyResult.bugs,
+    requests_sent: consistencyResult.requests,
+    duration: 0,
+  });
+  console.log(
+    `  [Consistency Checker] Done — ${consistencyResult.requests} requests, ${consistencyResult.bugs.length} bugs found`
+  );
+
+  // Oracle layer summary
+  const layerCounts: Record<number, number> = {};
+  for (const bug of allBugs) {
+    layerCounts[bug.oracle_layer] = (layerCounts[bug.oracle_layer] || 0) + 1;
+  }
+  const layerNames: Record<number, string> = {
+    1: "Status/Input Validation",
+    2: "Self-Consistency",
+    3: "Response Schema",
+  };
+  console.log("\n  Oracle layers:");
+  for (const [layer, name] of Object.entries(layerNames)) {
+    const count = layerCounts[Number(layer)] || 0;
+    const icon = count > 0 ? `${count} bugs` : "clean";
+    console.log(`    Layer ${layer}: ${name} — ${icon}`);
   }
 
   // Step 5: MINIMIZE (placeholder — delta debugging comes later)
@@ -62,5 +103,36 @@ export async function run(config: HavocConfig): Promise<void> {
 
   // Step 6: REPORT
   console.log("[6/6] REPORT\n");
-  reportBugs(allBugs, results);
+
+  // Deduplicate bugs across agents by fingerprint
+  const seen = new Set<string>();
+  const uniqueBugs = allBugs.filter((b) => {
+    if (seen.has(b.fingerprint)) return false;
+    seen.add(b.fingerprint);
+    return true;
+  });
+
+  // Track bugs in SQLite
+  const runDuration = performance.now() - runStart;
+  const tracker = new BugTracker();
+  const { newBugs, regressions, knownBugs } = tracker.trackBugs(
+    uniqueBugs, config.url, endpoints.length, runDuration
+  );
+  tracker.close();
+
+  reportBugs(uniqueBugs, results, { newBugs, regressions, knownBugs });
+
+  // --fail-on support
+  if (config.failOn) {
+    let shouldFail = false;
+    if (config.failOn === "any_bugs" && uniqueBugs.length > 0) shouldFail = true;
+    if (config.failOn === "new_bugs" && newBugs.length > 0) shouldFail = true;
+    if (config.failOn === "regressions" && regressions.length > 0) shouldFail = true;
+    if (config.failOn === "critical" && uniqueBugs.some((b) => b.severity === "critical")) shouldFail = true;
+
+    if (shouldFail) {
+      console.log(`\n  ❌ --fail-on ${config.failOn} triggered. Exiting with code 1.\n`);
+      process.exit(1);
+    }
+  }
 }

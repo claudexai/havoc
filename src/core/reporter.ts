@@ -8,8 +8,16 @@ const SEVERITY_COLORS: Record<Bug["severity"], string> = {
 };
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
+const GREEN = "\x1b[32m";
+const RED = "\x1b[31m";
 
-export function reportBugs(bugs: Bug[], results: AgentResult[]): void {
+interface TrackingInfo {
+  newBugs: Bug[];
+  regressions: Bug[];
+  knownBugs: Bug[];
+}
+
+export function reportBugs(bugs: Bug[], results: AgentResult[], tracking?: TrackingInfo): void {
   // Summary header
   console.log("═".repeat(60));
   console.log(`${BOLD}  HAVOC RESULTS${RESET}`);
@@ -29,8 +37,21 @@ export function reportBugs(bugs: Bug[], results: AgentResult[]): void {
   const totalRequests = results.reduce((s, r) => s + r.requests_sent, 0);
   console.log(`  Total: ${totalRequests} requests, ${bugs.length} unique bugs\n`);
 
+  // Tracking summary
+  if (tracking) {
+    const { newBugs, regressions, knownBugs } = tracking;
+    const parts: string[] = [];
+    if (newBugs.length > 0) parts.push(`${RED}${newBugs.length} new${RESET}`);
+    if (regressions.length > 0) parts.push(`${RED}${regressions.length} regressions${RESET}`);
+    if (knownBugs.length > 0) parts.push(`${knownBugs.length} known`);
+    if (parts.length > 0) {
+      console.log(`  Bug tracking: ${parts.join(" | ")}`);
+      console.log();
+    }
+  }
+
   if (bugs.length === 0) {
-    console.log("  ✅ No bugs found!\n");
+    console.log(`  ${GREEN}No bugs found!${RESET}\n`);
     return;
   }
 
@@ -43,6 +64,10 @@ export function reportBugs(bugs: Bug[], results: AgentResult[]): void {
   };
   bugs.sort((a, b) => order[a.severity] - order[b.severity]);
 
+  // Build sets for tracking labels
+  const newFingerprints = new Set(tracking?.newBugs.map((b) => b.fingerprint));
+  const regressionFingerprints = new Set(tracking?.regressions.map((b) => b.fingerprint));
+
   // Bug details
   console.log("─".repeat(60));
   console.log(`${BOLD}  BUGS${RESET}`);
@@ -51,9 +76,15 @@ export function reportBugs(bugs: Bug[], results: AgentResult[]): void {
   for (let i = 0; i < bugs.length; i++) {
     const bug = bugs[i];
     const color = SEVERITY_COLORS[bug.severity];
+
+    // Tracking label
+    let label = "";
+    if (newFingerprints.has(bug.fingerprint)) label = ` ${RED}[NEW]${RESET}`;
+    else if (regressionFingerprints.has(bug.fingerprint)) label = ` ${RED}[REGRESSION]${RESET}`;
+
     console.log();
     console.log(
-      `  ${color}${BOLD}[${bug.severity.toUpperCase()}]${RESET} ${bug.title}`
+      `  ${color}${BOLD}[${bug.severity.toUpperCase()}]${RESET} ${bug.title}${label}`
     );
     console.log(`  ${bug.description}`);
     console.log(`  Agent: ${bug.agent} | Oracle: Layer ${bug.oracle_layer} | Status: ${bug.response.status}`);

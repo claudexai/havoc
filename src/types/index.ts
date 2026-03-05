@@ -94,4 +94,5 @@ export interface HavocConfig {
   };
   timeout: number;
   seed: number;
+  failOn?: string;
 }
