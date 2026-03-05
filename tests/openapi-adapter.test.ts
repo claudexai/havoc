@@ -85,6 +85,71 @@ describe("OpenAPI Adapter", () => {
     expect(outputFieldNames).toContain("total");
   });
 
+  it("resolves allOf schemas into merged objects", async () => {
+    // Create a temp spec with allOf pattern (common in Strapi, etc.)
+    const { discover: discoverSpec } = await import("../src/adapters/openapi.js");
+    const fs = await import("fs");
+    const tmpSpec = {
+      openapi: "3.0.0",
+      info: { title: "allOf test", version: "1.0.0" },
+      paths: {
+        "/roles": {
+          get: {
+            responses: {
+              "200": {
+                description: "OK",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        roles: {
+                          type: "array",
+                          items: {
+                            allOf: [
+                              {
+                                type: "object",
+                                properties: {
+                                  id: { type: "integer" },
+                                  name: { type: "string" },
+                                },
+                              },
+                              {
+                                type: "object",
+                                properties: {
+                                  nb_users: { type: "number" },
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const tmpPath = "/tmp/havoc-allof-test.json";
+    fs.writeFileSync(tmpPath, JSON.stringify(tmpSpec));
+    const endpoints = await discoverSpec(tmpPath);
+    const getRoles = endpoints.find((e) => e.id === "GET /roles")!;
+    const rolesField = getRoles.output.fields.find((f) => f.name === "roles")!;
+    expect(rolesField.type).toBe("array");
+    // The items should be resolved as object (from merged allOf), not string
+    expect(rolesField.constraints.items).toBeDefined();
+    expect(rolesField.constraints.items!.type).toBe("object");
+    expect(rolesField.constraints.items!.constraints.fields).toBeDefined();
+    const fieldNames = rolesField.constraints.items!.constraints.fields!.map((f) => f.name);
+    expect(fieldNames).toContain("id");
+    expect(fieldNames).toContain("name");
+    expect(fieldNames).toContain("nb_users");
+    fs.unlinkSync(tmpPath);
+  });
+
   it("parses nested array items (orders)", async () => {
     const endpoints = await discover(SPEC_PATH);
     const createOrder = endpoints.find((e) => e.id === "POST /orders")!;

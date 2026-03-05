@@ -12,7 +12,8 @@ export function checkSchema(
   transport: HavocTransport,
   agent: string,
   generation: number,
-  wasInvalidInput: boolean
+  wasInvalidInput: boolean,
+  pathParams?: Record<string, string>
 ): Bug | null {
   // Connection failure — not a schema bug
   if (response.status === 0) return null;
@@ -28,7 +29,8 @@ export function checkSchema(
       generation,
       "medium",
       "Valid input rejected",
-      `Valid request to ${endpoint.id} returned ${response.status}`
+      `Valid request to ${endpoint.id} returned ${response.status}`,
+      pathParams
     );
   }
 
@@ -43,7 +45,8 @@ export function checkSchema(
       generation,
       "high",
       "Invalid input accepted",
-      `Invalid request to ${endpoint.id} returned ${response.status} instead of 4xx`
+      `Invalid request to ${endpoint.id} returned ${response.status} instead of 4xx`,
+      pathParams
     );
   }
 
@@ -58,7 +61,8 @@ export function checkSchema(
       generation,
       "critical",
       "Server error",
-      `${endpoint.id} returned ${response.status}`
+      `${endpoint.id} returned ${response.status}`,
+      pathParams
     );
   }
 
@@ -79,7 +83,8 @@ export function checkSchema(
               generation,
               "medium",
               "Response type mismatch",
-              `${endpoint.id}: field "${field.name}" ${typeError}`
+              `${endpoint.id}: field "${field.name}" ${typeError}`,
+              pathParams
             );
           }
         }
@@ -128,7 +133,8 @@ function makeBug(
   generation: number,
   severity: Bug["severity"],
   title: string,
-  description: string
+  description: string,
+  pathParams?: Record<string, string>
 ): Bug {
   const fingerprint = hashFingerprint(endpoint.id, title, response.status);
   return {
@@ -148,7 +154,7 @@ function makeBug(
       body: payload,
     },
     response,
-    curl: transport.buildCurl(endpoint, payload),
+    curl: transport.buildCurl(endpoint, payload, pathParams),
   };
 }
 

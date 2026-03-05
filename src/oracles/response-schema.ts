@@ -13,7 +13,8 @@ export function checkResponseSchema(
   response: HavocResponse,
   transport: HavocTransport,
   agent: string,
-  generation: number
+  generation: number,
+  pathParams?: Record<string, string>
 ): Bug[] {
   const bugs: Bug[] = [];
 
@@ -27,7 +28,7 @@ export function checkResponseSchema(
   for (const field of endpoint.output.fields) {
     const errors = validateField(field, body[field.name], field.name);
     for (const error of errors) {
-      bugs.push(makeBug(endpoint, payload, response, transport, agent, generation, error));
+      bugs.push(makeBug(endpoint, payload, response, transport, agent, generation, error, pathParams));
     }
   }
 
@@ -237,9 +238,12 @@ function makeBug(
   transport: HavocTransport,
   agent: string,
   generation: number,
-  error: FieldError
+  error: FieldError,
+  pathParams?: Record<string, string>
 ): Bug {
-  const fingerprint = hashFingerprint(endpoint.id, "response_schema", error.path);
+  // Strip array indices from path for dedup — roles[32].name and roles[49].name are the same bug
+  const dedupPath = error.path.replace(/\[\d+\]/g, "[]");
+  const fingerprint = hashFingerprint(endpoint.id, "response_schema", dedupPath);
   return {
     id: fingerprint,
     fingerprint,
@@ -257,7 +261,7 @@ function makeBug(
       body: payload,
     },
     response,
-    curl: transport.buildCurl(endpoint, payload),
+    curl: transport.buildCurl(endpoint, payload, pathParams),
   };
 }
 

@@ -159,10 +159,16 @@ export class TypeShapeshifter {
     const response = await this.transport.send(endpoint, payload, pathParams);
     this.requestCount++;
 
+    // GET/DELETE with no required body fields — mutations don't make input "invalid"
+    const hasBodyFields = endpoint.input.fields.some(
+      (f) => !endpoint.path.includes(`{${f.name}}`)
+    );
+    const wasInvalidInput = hasBodyFields || endpoint.input.required.length > 0;
+
     // Check with Oracle Layer 1
     const bug = checkSchema(
       endpoint, payload, response, this.transport,
-      "type_shapeshifter", 1, true
+      "type_shapeshifter", 1, wasInvalidInput, pathParams
     );
     if (bug) {
       bug.description += ` (type_shift: ${mutation})`;
@@ -173,7 +179,7 @@ export class TypeShapeshifter {
     if (response.status >= 200 && response.status < 300) {
       const schemaBugs = checkResponseSchema(
         endpoint, payload, response, this.transport,
-        "type_shapeshifter", 1
+        "type_shapeshifter", 1, pathParams
       );
       for (const sb of schemaBugs) {
         sb.description += ` (type_shift: ${mutation})`;

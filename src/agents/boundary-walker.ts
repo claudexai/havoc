@@ -145,9 +145,15 @@ export class BoundaryWalker {
     const response = await this.transport.send(endpoint, payload, pathParams);
     this.requestCount++;
 
+    // GET/DELETE with no required body fields — mutations don't make input "invalid"
+    const hasBodyFields = endpoint.input.fields.some(
+      (f) => !endpoint.path.includes(`{${f.name}}`)
+    );
+    const wasInvalidInput = hasBodyFields || endpoint.input.required.length > 0;
+
     const bug = checkSchema(
       endpoint, payload, response, this.transport,
-      "boundary_walker", 1, true
+      "boundary_walker", 1, wasInvalidInput, pathParams
     );
     if (bug) {
       bug.description += ` (${label})`;
@@ -158,7 +164,7 @@ export class BoundaryWalker {
     if (response.status >= 200 && response.status < 300) {
       const schemaBugs = checkResponseSchema(
         endpoint, payload, response, this.transport,
-        "boundary_walker", 1
+        "boundary_walker", 1, pathParams
       );
       for (const sb of schemaBugs) {
         sb.description += ` (${label})`;

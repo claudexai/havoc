@@ -11,20 +11,26 @@ export async function discover(specPath: string): Promise<HavocEndpoint[]> {
       if (["get", "post", "put", "patch", "delete"].indexOf(method) === -1) continue;
 
       const endpoint = parseOperation(path, method.toUpperCase(), operation);
-      endpoints.push(endpoint);
+      if (endpoint) endpoints.push(endpoint);
     }
   }
 
   return endpoints;
 }
 
-function parseOperation(path: string, method: string, op: any): HavocEndpoint {
+function parseOperation(path: string, method: string, op: any): HavocEndpoint | null {
   const id = `${method} ${path}`;
   const fields: Field[] = [];
   const required: string[] = [];
 
   // Parse request body (POST/PUT/PATCH)
+  // Skip endpoints that only accept multipart/form-data (file uploads)
   if (op.requestBody) {
+    const contentTypes = Object.keys(op.requestBody.content || {});
+    const isMultipartOnly = contentTypes.length > 0 &&
+      contentTypes.every((ct) => ct.includes("multipart") || ct.includes("octet-stream"));
+    if (isMultipartOnly) return null;
+
     const content = op.requestBody.content?.["application/json"];
     if (content?.schema) {
       const bodyFields = schemaToFields(content.schema);
@@ -92,6 +98,9 @@ function parseOperation(path: string, method: string, op: any): HavocEndpoint {
 function schemaToFields(schema: any): Field[] {
   if (!schema) return [];
 
+  // Resolve allOf at the top level too
+  schema = resolveAllOf(schema);
+
   // If the schema itself is an object with properties, return those fields
   if (schema.type === "object" || schema.properties) {
     const fields: Field[] = [];
@@ -119,7 +128,26 @@ function schemaToFields(schema: any): Field[] {
   return [];
 }
 
+function resolveAllOf(prop: any): any {
+  if (!prop.allOf) return prop;
+  // Merge all allOf entries into a single schema
+  let merged: any = {};
+  for (const part of prop.allOf) {
+    const resolved = resolveAllOf(part);
+    merged = {
+      ...merged,
+      ...resolved,
+      properties: { ...merged.properties, ...resolved.properties },
+      required: [...(merged.required || []), ...(resolved.required || [])],
+    };
+  }
+  // Carry over any sibling properties from the original (e.g. nullable, description)
+  const { allOf, ...siblings } = prop;
+  return { ...merged, ...siblings, properties: { ...merged.properties, ...siblings.properties } };
+}
+
 function propToField(name: string, prop: any): Field {
+  prop = resolveAllOf(prop);
   const type = mapType(prop);
   const constraints: Field["constraints"] = {};
 
