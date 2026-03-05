@@ -1,5 +1,6 @@
 import { HavocConfig, HavocEndpoint, Bug, AgentResult } from "../types/index.js";
 import { discover } from "../adapters/openapi.js";
+import { autoDetectSpec } from "../core/auto-detect.js";
 import { generateSeeds, Seed } from "../core/seed.js";
 import { HavocTransport } from "../transport/rest.js";
 import { runBaseline, Baseline } from "../core/baseline.js";
@@ -11,15 +12,24 @@ export async function run(config: HavocConfig): Promise<void> {
   const runStart = performance.now();
   console.log("\n⚔️  HAVOC — Multi-Agent API Adversarial Testing Engine\n");
 
+  // Step 0: AUTO-DETECT (if no spec provided)
+  let specSource = config.spec;
+  if (!specSource) {
+    console.log("[0/6] AUTO-DETECT — Searching for OpenAPI spec...");
+    const detectedUrl = await autoDetectSpec(config.url);
+    if (detectedUrl) {
+      console.log(`  Found spec at ${detectedUrl}\n`);
+      specSource = detectedUrl;
+    } else {
+      console.error("  Could not auto-detect OpenAPI spec.");
+      console.error("  Provide it manually: havoc run --url <target> --spec <path-or-url>\n");
+      process.exit(1);
+    }
+  }
+
   // Step 1: DISCOVER
   console.log("[1/6] DISCOVER — Parsing API spec...");
-  let endpoints: HavocEndpoint[];
-  if (config.spec) {
-    endpoints = await discover(config.spec);
-  } else {
-    console.error("Error: --spec is required for now (auto-discovery coming later)");
-    process.exit(1);
-  }
+  const endpoints = await discover(specSource);
   console.log(`  Found ${endpoints.length} endpoints\n`);
 
   // Step 2: SEED
@@ -32,6 +42,13 @@ export async function run(config: HavocConfig): Promise<void> {
   console.log("[3/6] BASELINE — Recording normal behavior...");
   const baselines = await runBaseline(transport, seeds);
   console.log(`  Baselined ${baselines.length} endpoints\n`);
+
+  // Auth warning: if every baseline returned 401/403, skip the attack phase
+  if (checkAllUnauthorized(baselines)) {
+    console.log("  \x1b[33mAll endpoints returned 401/403 — your API requires authentication.\x1b[0m");
+    console.log("  Run with: havoc run --url <target> -H \"Authorization: Bearer YOUR_TOKEN\"\n");
+    process.exit(1);
+  }
 
   // Step 4: ATTACK
   console.log("[4/6] ATTACK — Agents engaging...\n");
@@ -137,6 +154,11 @@ export async function run(config: HavocConfig): Promise<void> {
       process.exit(1);
     }
   }
+}
+
+export function checkAllUnauthorized(baselines: Baseline[]): boolean {
+  if (baselines.length === 0) return false;
+  return baselines.every((b) => b.expectedStatus === 401 || b.expectedStatus === 403);
 }
 
 export function checkFailOn(

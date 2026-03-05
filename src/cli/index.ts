@@ -13,7 +13,7 @@ program
   .command("run")
   .description("Run adversarial tests against an API")
   .requiredOption("--url <url>", "Target API base URL")
-  .option("--spec <path>", "Path to OpenAPI/Swagger spec file")
+  .option("--spec <path>", "OpenAPI/Swagger spec (auto-detected if omitted)")
   .option("--graphql <url>", "GraphQL endpoint URL (auto-introspection)")
   .option("-H, --header <headers...>", "Request headers (e.g. 'Authorization: Bearer token')")
   .option("--agents <agents>", "Comma-separated list of agents to run", "boundary_walker,mutant_breeder,type_shapeshifter")
