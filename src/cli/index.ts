@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Command } from "commander";
 import { run } from "../core/runner.js";
 
@@ -15,7 +16,7 @@ program
   .option("--spec <path>", "Path to OpenAPI/Swagger spec file")
   .option("--graphql <url>", "GraphQL endpoint URL (auto-introspection)")
   .option("-H, --header <headers...>", "Request headers (e.g. 'Authorization: Bearer token')")
-  .option("--agents <agents>", "Comma-separated list of agents to run", "boundary_walker,mutant_breeder")
+  .option("--agents <agents>", "Comma-separated list of agents to run", "boundary_walker,mutant_breeder,type_shapeshifter")
   .option("--timeout <ms>", "Attack phase timeout in ms", "60000")
   .option("--seed <number>", "RNG seed for deterministic runs", "42")
   .option("--fail-on <condition>", "Exit with code 1 if condition met (e.g. new_bugs)")
@@ -51,6 +52,8 @@ program
       timeout: parseInt(opts.timeout, 10),
       seed: parseInt(opts.seed, 10),
       failOn: opts.failOn,
+      format: opts.format,
+      output: opts.output,
     });
   });
 

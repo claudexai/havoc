@@ -5,7 +5,7 @@ import { HavocTransport } from "../transport/rest.js";
 import { runBaseline, Baseline } from "../core/baseline.js";
 import { ConsistencyChecker } from "../oracles/consistency.js";
 import { BugTracker } from "../core/bug-tracker.js";
-import { reportBugs } from "../core/reporter.js";
+import { reportBugs, reportJson } from "../core/reporter.js";
 
 export async function run(config: HavocConfig): Promise<void> {
   const runStart = performance.now();
@@ -67,14 +67,16 @@ export async function run(config: HavocConfig): Promise<void> {
 
   // Oracle Layer 2: Self-consistency checks (runs after agents)
   console.log("\n  [Consistency Checker] Running self-consistency checks...");
+  const consistencyStart = performance.now();
   const consistency = new ConsistencyChecker(transport, endpoints, seeds);
   const consistencyResult = await consistency.run("consistency_checker", 1);
+  const consistencyDuration = performance.now() - consistencyStart;
   allBugs.push(...consistencyResult.bugs);
   results.push({
     agent: "consistency_checker",
     bugs: consistencyResult.bugs,
     requests_sent: consistencyResult.requests,
-    duration: 0,
+    duration: consistencyDuration,
   });
   console.log(
     `  [Consistency Checker] Done — ${consistencyResult.requests} requests, ${consistencyResult.bugs.length} bugs found`
@@ -120,7 +122,12 @@ export async function run(config: HavocConfig): Promise<void> {
   );
   tracker.close();
 
-  reportBugs(uniqueBugs, results, { newBugs, regressions, knownBugs });
+  const trackingInfo = { newBugs, regressions, knownBugs };
+  if (config.format === "json") {
+    reportJson(uniqueBugs, results, trackingInfo, config.output);
+  } else {
+    reportBugs(uniqueBugs, results, trackingInfo);
+  }
 
   // --fail-on support
   if (config.failOn) {

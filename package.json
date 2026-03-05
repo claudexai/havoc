@@ -26,7 +26,7 @@
     "fuzzing",
     "adversarial"
   ],
-  "author": "",
+  "author": "claudexai",
   "license": "MIT",
   "engines": {
     "node": ">=22"

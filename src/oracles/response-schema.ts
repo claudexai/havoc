@@ -1,5 +1,6 @@
 import { HavocEndpoint, HavocResponse, Bug, Field } from "../types/index.js";
 import { HavocTransport } from "../transport/rest.js";
+import { hashFingerprint } from "../core/fingerprint.js";
 
 // Oracle Layer 3: Response Schema Validation
 // Deep validation of response body against spec — not just status codes.
@@ -260,12 +261,3 @@ function makeBug(
   };
 }
 
-function hashFingerprint(endpointId: string, errorType: string, path: string): string {
-  const str = `${endpointId}|${errorType}|${path}`;
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash + char) | 0;
-  }
-  return `bug_${Math.abs(hash).toString(36)}`;
-}

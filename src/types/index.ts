@@ -95,4 +95,6 @@ export interface HavocConfig {
   timeout: number;
   seed: number;
   failOn?: string;
+  format: string;
+  output?: string;
 }

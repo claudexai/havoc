@@ -93,8 +93,7 @@ export class TypeShapeshifter {
           { value: ["string"], label: "array_instead" },
           { value: { value: "string" }, label: "object_instead" },
           { value: "\0", label: "null_byte" },
-          { value: "\u0000hidden\u0000", label: "embedded_null_bytes" },
-          { value: "a".repeat(1_000_000), label: "1MB_string" }
+          { value: "\u0000hidden\u0000", label: "embedded_null_bytes" }
         );
         break;
 

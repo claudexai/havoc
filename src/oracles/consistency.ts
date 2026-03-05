@@ -1,6 +1,7 @@
 import { HavocEndpoint, HavocResponse, Bug } from "../types/index.js";
 import { HavocTransport } from "../transport/rest.js";
 import { Seed } from "../core/seed.js";
+import { hashFingerprint } from "../core/fingerprint.js";
 
 // Oracle Layer 2: Self-Consistency Checks
 // POST creates resource → GET it back → compare data matches
@@ -228,7 +229,7 @@ export class ConsistencyChecker {
     title: string,
     description: string
   ): Bug {
-    const fingerprint = this.hashFingerprint(endpoint.id, title, description);
+    const fingerprint = hashFingerprint(endpoint.id, title, description);
     return {
       id: fingerprint,
       fingerprint,
@@ -250,13 +251,4 @@ export class ConsistencyChecker {
     };
   }
 
-  private hashFingerprint(endpointId: string, errorType: string, detail: string): string {
-    const str = `${endpointId}|${errorType}|${detail}`;
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash + char) | 0;
-    }
-    return `bug_${Math.abs(hash).toString(36)}`;
-  }
 }

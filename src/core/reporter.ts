@@ -1,4 +1,5 @@
 import { Bug, AgentResult } from "../types/index.js";
+import fs from "fs";
 
 const SEVERITY_COLORS: Record<Bug["severity"], string> = {
   critical: "\x1b[31m", // red
@@ -112,4 +113,65 @@ export function reportBugs(bugs: Bug[], results: AgentResult[], tracking?: Track
   console.log(`  ${parts.join(" | ")}`);
   console.log("═".repeat(60));
   console.log();
+}
+
+export function reportJson(
+  bugs: Bug[],
+  results: AgentResult[],
+  tracking?: TrackingInfo,
+  outputPath?: string
+): void {
+  const newFingerprints = new Set(tracking?.newBugs.map((b) => b.fingerprint));
+  const regressionFingerprints = new Set(tracking?.regressions.map((b) => b.fingerprint));
+
+  const report = {
+    summary: {
+      total_requests: results.reduce((s, r) => s + r.requests_sent, 0),
+      total_bugs: bugs.length,
+      new_bugs: tracking?.newBugs.length ?? 0,
+      regressions: tracking?.regressions.length ?? 0,
+      known_bugs: tracking?.knownBugs.length ?? 0,
+      severity: {
+        critical: bugs.filter((b) => b.severity === "critical").length,
+        high: bugs.filter((b) => b.severity === "high").length,
+        medium: bugs.filter((b) => b.severity === "medium").length,
+        low: bugs.filter((b) => b.severity === "low").length,
+      },
+    },
+    agents: results.map((r) => ({
+      name: r.agent,
+      requests_sent: r.requests_sent,
+      bugs_found: r.bugs.length,
+      duration_ms: Math.round(r.duration),
+    })),
+    bugs: bugs.map((b) => ({
+      fingerprint: b.fingerprint,
+      severity: b.severity,
+      title: b.title,
+      description: b.description,
+      agent: b.agent,
+      oracle_layer: b.oracle_layer,
+      endpoint: b.endpoint.id,
+      status: newFingerprints.has(b.fingerprint)
+        ? "new"
+        : regressionFingerprints.has(b.fingerprint)
+          ? "regression"
+          : "known",
+      request: b.request,
+      response: {
+        status: b.response.status,
+        timing: Math.round(b.response.timing),
+      },
+      curl: b.curl,
+    })),
+  };
+
+  const json = JSON.stringify(report, null, 2);
+
+  if (outputPath) {
+    fs.writeFileSync(outputPath, json);
+    console.log(`  JSON report written to ${outputPath}\n`);
+  } else {
+    console.log(json);
+  }
 }
