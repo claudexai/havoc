@@ -206,6 +206,150 @@ describe("OpenAPI Adapter", () => {
     fs.unlinkSync(tmpPath);
   });
 
+  it("handles circular $ref without crashing (depth guard)", async () => {
+    const fs = await import("fs");
+    // Schema where "Node" references itself via children -> items -> Node
+    const tmpSpec = {
+      openapi: "3.0.0",
+      info: { title: "circular ref test", version: "1.0.0" },
+      paths: {
+        "/tree": {
+          get: {
+            responses: {
+              "200": {
+                description: "OK",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        id: { type: "integer" },
+                        name: { type: "string" },
+                        children: {
+                          type: "array",
+                          items: {
+                            // After dereference, this would be the same object (circular)
+                            // We simulate deep nesting instead since we can't use $ref in inline JSON
+                            type: "object",
+                            properties: {
+                              id: { type: "integer" },
+                              children: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    id: { type: "integer" },
+                                    children: {
+                                      type: "array",
+                                      items: {
+                                        type: "object",
+                                        properties: {
+                                          id: { type: "integer" },
+                                          children: {
+                                            type: "array",
+                                            items: {
+                                              type: "object",
+                                              properties: {
+                                                id: { type: "integer" },
+                                                children: {
+                                                  type: "array",
+                                                  items: {
+                                                    type: "object",
+                                                    properties: {
+                                                      id: { type: "integer" },
+                                                      children: {
+                                                        type: "array",
+                                                        items: {
+                                                          type: "object",
+                                                          properties: {
+                                                            id: { type: "integer" },
+                                                            children: {
+                                                              type: "array",
+                                                              items: {
+                                                                type: "object",
+                                                                properties: {
+                                                                  id: { type: "integer" },
+                                                                  children: {
+                                                                    type: "array",
+                                                                    items: {
+                                                                      type: "object",
+                                                                      properties: {
+                                                                        id: { type: "integer" },
+                                                                        children: {
+                                                                          type: "array",
+                                                                          items: {
+                                                                            type: "object",
+                                                                            properties: {
+                                                                              id: { type: "integer" },
+                                                                              // 11 levels deep — exceeds MAX_DEPTH=10
+                                                                              children: { type: "array", items: { type: "object", properties: { id: { type: "integer" } } } },
+                                                                            },
+                                                                          },
+                                                                        },
+                                                                      },
+                                                                    },
+                                                                  },
+                                                                },
+                                                              },
+                                                            },
+                                                          },
+                                                        },
+                                                      },
+                                                    },
+                                                  },
+                                                },
+                                              },
+                                            },
+                                          },
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const tmpPath = "/tmp/havoc-circular-test.json";
+    fs.writeFileSync(tmpPath, JSON.stringify(tmpSpec));
+
+    // Should not throw (previously would stack overflow without depth guard)
+    const endpoints = await discover(tmpPath);
+    expect(endpoints.length).toBe(1);
+
+    const getTree = endpoints.find((e) => e.id === "GET /tree")!;
+    expect(getTree).toBeDefined();
+
+    // Top-level fields should be parsed
+    const fieldNames = getTree.output.fields.map((f) => f.name);
+    expect(fieldNames).toContain("id");
+    expect(fieldNames).toContain("children");
+
+    // Recursion should stop at depth — deep children should not have nested items
+    let node = getTree.output.fields.find((f) => f.name === "children")!;
+    let depth = 0;
+    while (node.constraints.items?.constraints.fields && depth < 15) {
+      const childrenField = node.constraints.items.constraints.fields.find((f) => f.name === "children");
+      if (!childrenField) break;
+      node = childrenField;
+      depth++;
+    }
+    // Should have stopped recursing before depth 15 (MAX_DEPTH is 10)
+    expect(depth).toBeLessThan(12);
+
+    fs.unlinkSync(tmpPath);
+  });
+
   it("parses nested array items (orders)", async () => {
     const endpoints = await discover(SPEC_PATH);
     const createOrder = endpoints.find((e) => e.id === "POST /orders")!;
