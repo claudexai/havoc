@@ -160,7 +160,9 @@ function resolveComposedSchema(prop: any): any {
   return prop;
 }
 
-function propToField(name: string, prop: any): Field {
+const MAX_DEPTH = 10;
+
+function propToField(name: string, prop: any, depth = 0): Field {
   prop = resolveComposedSchema(prop);
   const type = mapType(prop);
   const constraints: Field["constraints"] = {};
@@ -178,14 +180,17 @@ function propToField(name: string, prop: any): Field {
   if (prop.maxLength !== undefined) constraints.max_length = prop.maxLength;
   if (prop.format) constraints.format = prop.format;
 
-  if (type === "array" && prop.items) {
-    constraints.items = propToField("_item", prop.items);
-  }
+  // Stop recursing at max depth to prevent circular $ref stack overflow
+  if (depth < MAX_DEPTH) {
+    if (type === "array" && prop.items) {
+      constraints.items = propToField("_item", prop.items, depth + 1);
+    }
 
-  if (type === "object" && prop.properties) {
-    constraints.fields = [];
-    for (const [childName, childProp] of Object.entries(prop.properties) as [string, any][]) {
-      constraints.fields.push(propToField(childName, childProp));
+    if (type === "object" && prop.properties) {
+      constraints.fields = [];
+      for (const [childName, childProp] of Object.entries(prop.properties) as [string, any][]) {
+        constraints.fields.push(propToField(childName, childProp, depth + 1));
+      }
     }
   }
 
