@@ -4,6 +4,8 @@
 
 3 agents. 3 oracle layers. 200+ requests. Every bug comes with a paste-able `curl` command.
 
+![Havoc Demo](demo.gif)
+
 ```bash
 npx havoc run --spec https://example.schemathesis.io/openapi.json --url https://example.schemathesis.io
 ```
