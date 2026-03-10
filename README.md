@@ -7,7 +7,7 @@
 ![Havoc Demo](demo.gif)
 
 ```bash
-npx havoc run --spec https://example.schemathesis.io/openapi.json --url https://example.schemathesis.io
+npx @claudexai/havoc run --spec https://example.schemathesis.io/openapi.json --url https://example.schemathesis.io
 ```
 
 ```
@@ -62,23 +62,23 @@ Havoc uses **3 competing agents** with **3 oracle layers** that catch crashes, w
 
 ```bash
 # Any API with an OpenAPI spec
-npx havoc run --spec ./openapi.yaml --url http://localhost:3000
+npx @claudexai/havoc run --spec ./openapi.yaml --url http://localhost:3000
 
 # Remote spec
-npx havoc run \
+npx @claudexai/havoc run \
   --spec https://petstore3.swagger.io/api/v3/openapi.json \
   --url https://petstore3.swagger.io/api/v3
 
 # With auth
-npx havoc run --spec ./api.yaml --url http://localhost:3000 \
+npx @claudexai/havoc run --spec ./api.yaml --url http://localhost:3000 \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Only run specific agents
-npx havoc run --spec ./api.yaml --url http://localhost:3000 \
+npx @claudexai/havoc run --spec ./api.yaml --url http://localhost:3000 \
   --agents boundary_walker,type_shapeshifter
 
 # CI mode — exit code 1 if new bugs found
-npx havoc run --spec ./api.yaml --url http://localhost:3000 \
+npx @claudexai/havoc run --spec ./api.yaml --url http://localhost:3000 \
   --fail-on new_bugs
 ```
 
@@ -227,9 +227,9 @@ Run 3 (Wednesday): 4 bugs → 3 known, 1 REGRESSION ⚠️
 CI integration:
 
 ```bash
-npx havoc run --spec ./api.yaml --url http://localhost:3000 --fail-on new_bugs      # block PRs with new bugs
-npx havoc run --spec ./api.yaml --url http://localhost:3000 --fail-on regressions   # catch regressions
-npx havoc run --spec ./api.yaml --url http://localhost:3000 --fail-on critical      # only block on 500s
+npx @claudexai/havoc run --spec ./api.yaml --url http://localhost:3000 --fail-on new_bugs      # block PRs with new bugs
+npx @claudexai/havoc run --spec ./api.yaml --url http://localhost:3000 --fail-on regressions   # catch regressions
+npx @claudexai/havoc run --spec ./api.yaml --url http://localhost:3000 --fail-on critical      # only block on 500s
 ```
 
 ---
@@ -248,7 +248,7 @@ npx havoc run --spec ./api.yaml --url http://localhost:3000 --fail-on critical  
 ## CLI Reference
 
 ```
-npx havoc run
+npx @claudexai/havoc run
   --spec <path-or-url>        OpenAPI spec (required)
   --url <target>              API base URL (required)
   --agents <list>             Agents to run (default: all)
@@ -263,7 +263,7 @@ npx havoc run
 ## Try It
 
 ```bash
-git clone <repo-url> && cd havoc && npm install
+git clone https://github.com/claudexai/havoc.git && cd havoc && npm install
 
 # Against Schemathesis demo (known bugs, zero setup)
 npm run dev -- run \

@@ -1,7 +1,7 @@
 {
   "name": "@claudexai/havoc",
   "version": "0.1.0",
-  "description": "Multi-agent API adversarial testing engine",
+  "description": "Multi-agent adversarial API testing CLI. 3 agents, 3 oracle layers, every bug gets a curl command.",
   "type": "module",
   "main": "dist/cli/index.js",
   "bin": {
@@ -16,15 +16,31 @@
     "test:watch": "vitest",
     "test:server": "node test-server/server.js"
   },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "repository": {
     "type": "git",
-    "url": "git@github-personal:claudexai/havoc.git"
+    "url": "https://github.com/claudexai/havoc.git"
+  },
+  "homepage": "https://github.com/claudexai/havoc",
+  "bugs": {
+    "url": "https://github.com/claudexai/havoc/issues"
   },
   "keywords": [
     "api",
     "testing",
     "fuzzing",
-    "adversarial"
+    "adversarial",
+    "openapi",
+    "swagger",
+    "security",
+    "rest-api",
+    "fuzz-testing",
+    "api-testing"
   ],
   "author": "claudexai",
   "license": "MIT",
