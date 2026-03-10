@@ -1,5 +1,5 @@
 {
-  "name": "havoc",
+  "name": "@claudexai/havoc",
   "version": "0.1.0",
   "description": "Multi-agent API adversarial testing engine",
   "type": "module",
