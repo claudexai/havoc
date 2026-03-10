@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { Command } from "commander";
 import { run } from "../core/runner.js";
 
@@ -7,7 +6,7 @@ const program = new Command();
 program
   .name("havoc")
   .description("Multi-agent API adversarial testing engine")
-  .version("0.1.0");
+  .version("0.1.1");
 
 program
   .command("run")

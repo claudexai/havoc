@@ -1,6 +1,6 @@
 {
   "name": "@claudexai/havoc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-agent adversarial API testing CLI. 3 agents, 3 oracle layers, every bug gets a curl command.",
   "type": "module",
   "main": "dist/cli/index.js",
